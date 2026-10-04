@@ -15,11 +15,16 @@ const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('
 const needLogin = note => { if (me) return false; authModal('login', note || 'Log in or create an account to do that.'); return true; };
 
 function show(html, keep) {
-  const y = $('#ov').scrollTop;
+  const y = $('#ov').scrollTop; $('#ov').className = mode === 'post' ? 'page' : '';
   $('#sheet').innerHTML = html; $('#ov').hidden = false; document.body.style.overflow = 'hidden';
   $('#ov').scrollTop = keep ? y : 0;
 }
-function closeM() { $('#ov').hidden = true; document.body.style.overflow = ''; cur = null; mode = ''; }
+let pushed = false;
+function closeM() {
+  if (pushed) { pushed = false; history.back(); return; }
+  $('#ov').hidden = true; document.body.style.overflow = ''; cur = null; mode = '';
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+}
 
 // ---------- feed ----------
 const bar = p => `<div class="acts">
@@ -65,14 +70,14 @@ function renderModal() {
     <button class="btn ${c.liked ? 'on' : ''}" data-act="clk" data-id="${c.id}">${c.liked ? 'Liked' : 'Like'} ${c.likes}</button>${me && (me.username === c.username || me.username === p.username) ? `<button class="btn del" data-act="cdel" data-id="${c.id}">Delete</button>` : ''}</div>`).join('') : '<p class="note">No comments yet. Start the discussion.</p>';
   const form = me ? '<form id="cf" class="new"><input id="ci" maxlength="500" placeholder="Add to the discussion" aria-label="Comment"><button class="primary">Post</button></form>'
     : '<p class="note"><button class="link" data-act="login">Log in</button> or <button class="link" data-act="signup">create an account</button> to join the discussion.</p>';
-  show(`<button class="x" data-act="close" aria-label="Close">×</button>${byline(p)}<h2>${esc(p.title)}</h2>${tagsOf(p)}
+  show(`<button class="back" data-act="close">← All studies</button>${byline(p)}<h2>${esc(p.title)}</h2>${tagsOf(p)}
     <h3>Abstract</h3><p class="pre">${esc(p.abstract)}</p>${p.body ? `<h3>Details</h3><p class="pre">${esc(p.body)}</p>` : ''}
     ${p.url ? `<p><a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Read the original source</a></p>` : ''}${bar(p)}
     <h3>Comments (${p.comments})</h3>${list}${form}`, true);
   if ($('#ci')) { $('#ci').value = keep; if (focusC) { focusC = false; $('#ci').focus(); } }
 }
 async function openPost(id, focus) {
-  cur = id; mode = 'post'; CM = null; focusC = !!focus; renderModal();
+  cur = id; mode = 'post'; CM = null; focusC = !!focus; if (!pushed) { history.pushState(null, '', '#/study/' + id); pushed = true; } renderModal();
   try { CM = await api('GET', `/api/posts/${id}/comments`); } catch (e) { CM = []; toast(e.message); }
   if (cur === id) renderModal();
 }
@@ -200,7 +205,10 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && me) refreshFriends(); });
 
+window.addEventListener('popstate', () => { if (!$('#ov').hidden && mode === 'post') { pushed = false; closeM(); } });
 (async () => {
   try { me = await api('GET', '/api/me'); } catch {}
-  renderNav(); refreshFriends(); load();
+  renderNav(); refreshFriends(); await load();
+  const m = location.hash.match(/^#\/study\/(\d+)/);
+  if (m && posts.some(p => p.id === +m[1])) openPost(+m[1]); else if (location.hash) history.replaceState(null, '', location.pathname);
 })();
