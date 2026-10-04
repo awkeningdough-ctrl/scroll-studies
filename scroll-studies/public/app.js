@@ -10,6 +10,10 @@ async function api(method, url, body) {
 let me = null, posts = [], more = false, scope = 'all', F = { q: '', tag: '', u: '' };
 let cur = null, CM = null, mode = '', focusC = false, FR = { friends: [], incoming: [], outgoing: [] };
 
+let theme = null; try { theme = localStorage.getItem('theme'); } catch {}
+const applyTheme = () => { if (theme) document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme; };
+const isDark = () => theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+applyTheme();
 const ago = t => { const m = Math.floor((Date.now() - new Date(t)) / 6e4); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : m < 10080 ? Math.floor(m / 1440) + ' d ago' : new Date(t).toLocaleDateString(); };
 const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500); };
 const needLogin = note => { if (me) return false; authModal('login', note || 'Log in or create an account to do that.'); return true; };
@@ -39,6 +43,7 @@ function renderNav() {
   $('#nav').innerHTML = me
     ? `<button class="ghost" data-act="people">Friends${FR.incoming.length ? ` <span class="badge">${FR.incoming.length}</span>` : ''}</button><button class="primary" data-act="compose">Share a study</button><button class="ghost" data-act="logout" title="Log out of @${esc(me.username)}">Log out</button>`
     : `<button class="ghost" data-act="login">Log in</button><button class="primary" data-act="signup">Create account</button>`;
+  $('#nav').insertAdjacentHTML('afterbegin', `<button class="ghost" data-act="theme">${isDark() ? 'Light mode' : 'Dark mode'}</button>`);
   $('#hero').innerHTML = me ? '' : `<div class="hero"><h1>Read studies the way you read your feed.</h1><p>Short summaries, full detail when you want it, and people who discuss the research. Create a free account to share studies, add friends and join the conversation.</p></div>`;
 }
 function renderFeed() {
@@ -170,6 +175,7 @@ document.addEventListener('click', async e => {
     else if (a === 'people') people();
     else if (a === 'fa') { await api('POST', '/api/friends/' + u); people($('#ps') ? $('#ps').value : ''); }
     else if (a === 'fr') { await api('DELETE', '/api/friends/' + u); people($('#ps') ? $('#ps').value : ''); }
+    else if (a === 'theme') { theme = isDark() ? 'light' : 'dark'; try { localStorage.setItem('theme', theme); } catch {} applyTheme(); renderNav(); }
     else if (a === 'close') closeM();
   } catch (err) { toast(err.message); }
 });
